@@ -10,6 +10,7 @@ from django.db import models
 
 VALID_PLANS = ["monthly", "yearly"]
 
+
 def calculate_subscription_end_date(plan):
     """Obuna rejasi bo'yicha muddati hisoblaydi"""
     if plan == "monthly":
@@ -38,8 +39,6 @@ class RegisterView(APIView):
             defaults={'username': username}  # Email qo'shilmagan
         )
         return Response({"message": "User registered successfully"}, status=status.HTTP_201_CREATED)
-
-
 
 
 class ConsentView(APIView):
@@ -74,7 +73,8 @@ class SubscriptionView(APIView):
 
         # Validate the subscription plan
         if plan not in VALID_PLANS:
-            return Response({"error": "Invalid plan type. Choose 'monthly' or 'yearly'."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Invalid plan type. Choose 'monthly' or 'yearly'."},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         # Set subscription duration based on the plan
         if plan == "monthly":
@@ -101,7 +101,6 @@ class SubscriptionView(APIView):
             "end_date": end_date,
             "is_active": subscription.is_active
         }, status=status.HTTP_201_CREATED)
-
 
 
 class PaymentView(APIView):
@@ -255,25 +254,33 @@ class UserProfileView(APIView):
         return Response(data, status=status.HTTP_200_OK)
 
 
-
 class GiftSubscriptionView(APIView):
     def post(self, request):
         user_id = request.data.get('user_id')
         recipient_id = request.data.get('recipient_id')
+        recipient_first_name = request.data.get('recipient_first_name', '')
+        recipient_last_name = request.data.get('recipient_last_name', '')
         plan = request.data.get('plan')
 
         try:
             user = User.objects.get(user_id=user_id)
-            recipient = User.objects.get(user_id=recipient_id)
         except User.DoesNotExist:
-            return Response({"error": f"User with ID {user_id} or recipient with ID {recipient_id} not found"},
+            return Response({"error": f"User with ID {user_id} not found"},
                             status=status.HTTP_404_NOT_FOUND)
 
-        plan = plan.lower()  # Obuna rejasini past harfga o'girib tekshirish
+        # Get or create recipient user
+        recipient, created = User.objects.get_or_create(
+            user_id=recipient_id,
+            defaults={
+                'username': '',  # Since we might not have the username
+                'name': f"{recipient_first_name} {recipient_last_name}".strip()
+            }
+        )
+
+        plan = plan.lower()
         if plan not in VALID_PLANS:
             return Response({"error": "Invalid plan type"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Obuna muddati hisoblash
         end_date = calculate_subscription_end_date(plan)
 
         Subscription.objects.update_or_create(
@@ -281,9 +288,8 @@ class GiftSubscriptionView(APIView):
             defaults={'plan': plan, 'end_date': end_date, 'is_active': True}
         )
 
-        return Response({"message": f"Subscription gifted to {recipient.username}", "plan": plan},
+        return Response({"message": f"Subscription gifted to {recipient.user_id}", "plan": plan},
                         status=status.HTTP_201_CREATED)
-
 
 
 class AboutProductView(APIView):
