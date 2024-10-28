@@ -1,0 +1,77 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+
+# Django
+db.sqlite3
+*.sqlite3
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3-journal
+
+# Virtual environment
+venv/
+.env/
+.venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Django static and media files
+staticfiles/
+media/
+
+# Django local settings
+*.local_settings.py
+settings_local.py
+
+# VS Code
+.vscode/
+.idea/
+
+# PyCharm
+.idea/
+*.iml
+
+# macOS
+.DS_Store
+
+# Linux
+*~
+
+# Log files
+*.log
+logs/
+*.log.*
+
+# Telegram bot tokens and config files
+config.json
+bot_token.txt
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+
+# Unit test / coverage reports
+.coverage
+.tox/
+*.cover
+coverage.xml
+nosetests.xml
+.pytest_cache/
+
+# MySQL database
+*.sql
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
