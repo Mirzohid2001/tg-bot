@@ -60,6 +60,18 @@ class ConsentView(APIView):
             return Response({"message": "Consent confirmed"}, status=status.HTTP_201_CREATED)
         return Response({"error": "Invalid data"}, status=status.HTTP_400_BAD_REQUEST)
 
+    def get(self, request, user_id):
+        try:
+            user = User.objects.get(user_id=user_id)
+            try:
+                consent = Consent.objects.get(user=user)
+                return Response({'consent_given': consent.consent_given}, status=status.HTTP_200_OK)
+            except Consent.DoesNotExist:
+                # Если запись согласия не найдена, возвращаем False
+                return Response({'consent_given': False}, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            return Response({"error": f"User with ID {user_id} not found"}, status=status.HTTP_404_NOT_FOUND)
+
 
 class SubscriptionView(APIView):
     def post(self, request):
@@ -142,31 +154,74 @@ class PaymentView(APIView):
         return Response({"message": "Payment recorded", "amount": amount}, status=status.HTTP_201_CREATED)
 
 
+class UserLanguageView(APIView):
+    def get(self, request, user_id):
+        try:
+            user = User.objects.get(user_id=user_id)
+            language = user.language if user.language else 'en'  # По умолчанию 'en'
+            return Response({'language': language}, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            return Response({"error": f"User with ID {user_id} not found"}, status=status.HTTP_404_NOT_FOUND)
 
-# class BuySubscriptionView(APIView):
-#     def post(self, request):
-#         user_id = request.data.get('user_id')
-#         plan = request.data.get('plan')
-#
-#         try:
-#             user = User.objects.get(user_id=user_id)
-#         except User.DoesNotExist:
-#             return Response({"error": f"User with ID {user_id} not found"}, status=status.HTTP_404_NOT_FOUND)
-#
-#         plan = plan.lower()  # Obuna rejasini past harfga o'girib tekshirish
-#         if plan not in VALID_PLANS:
-#             return Response({"error": "Invalid plan type"}, status=status.HTTP_400_BAD_REQUEST)
-#
-#         # Obuna muddati hisoblash
-#         end_date = calculate_subscription_end_date(plan)
-#
-#         subscription, created = Subscription.objects.update_or_create(
-#             user=user,
-#             defaults={'plan': plan, 'end_date': end_date, 'is_active': True}
-#         )
-#
-#         return Response({"message": "Subscription purchased", "plan": plan, "end_date": end_date},
-#                         status=status.HTTP_201_CREATED)
+    def post(self, request):
+        user_id = request.data.get('user_id')
+        language = request.data.get('language')
+        if not (user_id and language):
+            return Response({"error": "Invalid data"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            user = User.objects.get(user_id=user_id)
+            user.language = language
+            user.save()
+            return Response({"message": "Language updated successfully"}, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            return Response({"error": f"User with ID {user_id} not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+class SubscriptionView(APIView):
+    def post(self, request):
+        user_id = request.data.get('user_id')
+        plan = request.data.get('plan')
+        email = request.data.get('email')  # Email is required only during subscription purchase
+
+        # Validate the user
+        try:
+            user = User.objects.get(user_id=user_id)
+        except User.DoesNotExist:
+            return Response({"error": f"User with ID {user_id} not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Validate the subscription plan
+        if plan not in VALID_PLANS:
+            return Response({"error": "Invalid plan type. Choose 'monthly' or 'yearly'."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        # Set subscription duration based on the plan
+        if plan == "monthly":
+            end_date = timezone.now() + timedelta(days=30)
+        elif plan == "yearly":
+            end_date = timezone.now() + timedelta(days=365)
+
+        # Update user email only during subscription
+        if email:
+            user.email = email
+            user.save()
+
+        # Create or update the subscription record
+        subscription, created = Subscription.objects.update_or_create(
+            user=user,
+            defaults={'plan': plan, 'end_date': end_date, 'is_active': True}
+        )
+
+        # Деактивируем старые подписки, если необходимо
+        Subscription.objects.filter(user=user).exclude(id=subscription.id).update(is_active=False)
+
+        # Response message
+        message = "Subscription created" if created else "Subscription updated"
+        return Response({
+            "message": message,
+            "plan": plan,
+            "end_date": end_date,
+            "is_active": subscription.is_active
+        }, status=status.HTTP_201_CREATED)
 
 
 class SubscriptionStatusView(APIView):
@@ -245,17 +300,31 @@ class UserProfileView(APIView):
         except User.DoesNotExist:
             return Response({"error": f"User with ID {user_id} not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        subscriptions = Subscription.objects.filter(user=user)
-        payments = Payment.objects.filter(user=user)
-        subscription_data = [{"plan": sub.plan, "start_date": sub.start_date, "end_date": sub.end_date} for sub in
-                             subscriptions]
-        payment_data = [{"amount": pay.amount, "method": pay.payment_method, "date": pay.payment_date} for pay in
-                        payments]
+        # Получаем информацию о карте
+        try:
+            card = UserCard.objects.get(user=user)
+            card_info = {
+                "card_number": card.card_number,
+                "expiry_date": card.expiry_date.strftime('%m/%y')
+            }
+        except UserCard.DoesNotExist:
+            card_info = {}
+
+        # Получаем информацию о текущей активной подписке
+        try:
+            subscription = Subscription.objects.filter(user=user, is_active=True).latest('end_date')
+            subscription_info = {
+                "plan": subscription.plan,
+                "expires_at": subscription.end_date.strftime('%Y-%m-%d')
+            }
+        except Subscription.DoesNotExist:
+            subscription_info = {}
+
         data = {
-            "name": user.name,
-            "username": user.username,
-            "subscriptions": subscription_data,
-            "payments": payment_data
+            "name": user.name or "",
+            "username": user.username or "",
+            "card": card_info,
+            "subscription": subscription_info
         }
         return Response(data, status=status.HTTP_200_OK)
 
@@ -332,23 +401,32 @@ class MethodView(APIView):
         serializer = MethodSerializer(method, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+import logging
+
+logger = logging.getLogger(__name__)
 
 class SaveCardView(APIView):
     def post(self, request, *args, **kwargs):
         serializer = CardSerializer(data=request.data)
         if serializer.is_valid():
-            user_id = serializer.validated_data['user_id']
-            card_number = serializer.validated_data['card_number']
-            expiry_date = serializer.validated_data['expiry_date']
+            try:
+                user_id = serializer.validated_data['user_id']
+                card_number = serializer.validated_data['card_number']
+                expiry_date = serializer.validated_data['expiry_date']
 
-            # Foydalanuvchini olish
-            user = User.objects.get(user_id=user_id)
+                # Получаем пользователя
+                user = User.objects.get(user_id=user_id)
 
-            # Karta ma'lumotlarini saqlash yoki yangilash
-            UserCard.objects.update_or_create(
-                user=user,
-                defaults={'card_number': card_number, 'expiry_date': expiry_date}
-            )
+                # Сохраняем или обновляем данные карты
+                UserCard.objects.update_or_create(
+                    user=user,
+                    defaults={'card_number': card_number, 'expiry_date': expiry_date}
+                )
 
-            return Response({"message": "Card saved successfully."}, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"message": "Card saved successfully."}, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                logger.error(f"Error saving card: {e}")
+                return Response({"error": "Error saving card."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            logger.error(f"Validation error: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -9,7 +9,8 @@ from .views import (
     FeedbackView,
     PaymentCheckView,
     StatisticsView,
-    UserProfileView, GiftSubscriptionView, AboutProductView, SupportView,AdviceView,MethodView, SaveCardView
+    UserProfileView, GiftSubscriptionView, AboutProductView, SupportView, AdviceView, MethodView, SaveCardView,
+    UserLanguageView
 )
 
 urlpatterns = [
@@ -29,4 +30,9 @@ urlpatterns = [
     path('advice/', AdviceView.as_view(), name='advice'),
     path('method/', MethodView.as_view(), name='method'),
     path('save-card/', SaveCardView.as_view(), name='save-card'),
+    path('register/', RegisterView.as_view(), name='register'),
+    path('consent/', ConsentView.as_view(), name='consent_post'),  # Для POST запросов
+    path('consent/<int:user_id>/', ConsentView.as_view(), name='consent_get'),  # Для GET запросов
+    path('user-language/', UserLanguageView.as_view(), name='user_language_post'),  # Для POST запросов
+    path('user-language/<int:user_id>/', UserLanguageView.as_view(), name='user_language_get'),  # Для GET запросов
 ]

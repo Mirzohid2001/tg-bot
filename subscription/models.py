@@ -5,6 +5,8 @@ class User(models.Model):
     user_id = models.CharField(max_length=255, unique=True)
     name = models.CharField(max_length=255, null=True, blank=True)
     username = models.CharField(max_length=255)
+    language = models.CharField(max_length=10, default='en')  # Добавлено поле языка
+
     email = models.EmailField(max_length=255, unique=True, null=True, blank=True)
     registration_time = models.DateTimeField(auto_now_add=True)
 
