@@ -9,7 +9,7 @@ from .views import (
     FeedbackView,
     PaymentCheckView,
     StatisticsView,
-    UserProfileView, GiftSubscriptionView, AboutProductView, SupportView
+    UserProfileView, GiftSubscriptionView, AboutProductView, SupportView,AdviceView,MethodView, SaveCardView
 )
 
 urlpatterns = [
@@ -26,4 +26,7 @@ urlpatterns = [
     path('gift/', GiftSubscriptionView.as_view(), name='gift'),
     path('about/', AboutProductView.as_view(), name='about'),
     path('support/', SupportView.as_view(), name='support'),
+    path('advice/', AdviceView.as_view(), name='advice'),
+    path('method/', MethodView.as_view(), name='method'),
+    path('save-card/', SaveCardView.as_view(), name='save-card'),
 ]

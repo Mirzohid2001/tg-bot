@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User, Consent, Subscription, Payment, HelpSection, Feedback, SubscriptionStatistics
+from .models import User, Consent, Subscription, Payment, HelpSection, Feedback, SubscriptionStatistics ,Advice, Method, UserCard
 
 # User modeli uchun admin interfeysni sozlash
 @admin.register(User)
@@ -47,3 +47,7 @@ class SubscriptionStatisticsAdmin(admin.ModelAdmin):
     list_display = ('user', 'total_payments', 'subscription_count', 'last_payment_date')
     search_fields = ('user__name',)
     list_filter = ('last_payment_date',)
+
+admin.site.register(Advice)
+admin.site.register(Method)
+admin.site.register(UserCard)

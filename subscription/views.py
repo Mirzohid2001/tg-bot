@@ -1,12 +1,14 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .models import User, Consent, Subscription, Payment, SubscriptionStatistics, Feedback, HelpSection
+from .models import User, Consent, Subscription, Payment, SubscriptionStatistics, Feedback, HelpSection, Advice, Method, \
+    UserCard
 from datetime import timedelta
 from django.utils import timezone
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db import models
+from .serializers import AdviceSerializer, MethodSerializer, CardSerializer
 
 VALID_PLANS = ["monthly", "yearly"]
 
@@ -112,6 +114,9 @@ class PaymentView(APIView):
         card_number = request.data.get('card_number', None)
         transaction_id = request.data.get('transaction_id', None)
 
+        if not payment_method:
+            return Response({"error": "Payment method is required."}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
             user = User.objects.get(user_id=user_id)
         except ObjectDoesNotExist:
@@ -135,6 +140,7 @@ class PaymentView(APIView):
         )
 
         return Response({"message": "Payment recorded", "amount": amount}, status=status.HTTP_201_CREATED)
+
 
 
 # class BuySubscriptionView(APIView):
@@ -311,3 +317,38 @@ class SupportView(APIView):
             "working_hours": "9 AM to 6 PM (Monday to Friday)"
         }
         return Response(support_info, status=status.HTTP_200_OK)
+
+
+class AdviceView(APIView):
+    def get(self, request):
+        advice = Advice.objects.all()
+        serializer = AdviceSerializer(advice, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class MethodView(APIView):
+    def get(self, request):
+        method = Method.objects.all()
+        serializer = MethodSerializer(method, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class SaveCardView(APIView):
+    def post(self, request, *args, **kwargs):
+        serializer = CardSerializer(data=request.data)
+        if serializer.is_valid():
+            user_id = serializer.validated_data['user_id']
+            card_number = serializer.validated_data['card_number']
+            expiry_date = serializer.validated_data['expiry_date']
+
+            # Foydalanuvchini olish
+            user = User.objects.get(user_id=user_id)
+
+            # Karta ma'lumotlarini saqlash yoki yangilash
+            UserCard.objects.update_or_create(
+                user=user,
+                defaults={'card_number': card_number, 'expiry_date': expiry_date}
+            )
+
+            return Response({"message": "Card saved successfully."}, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
